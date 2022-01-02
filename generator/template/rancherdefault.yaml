@@ -1,0 +1,86 @@
+---
+  # 负载均衡
+  apiVersion: extensions/v1beta1
+  kind: Ingress
+  metadata:
+    namespace: <%=  namespace %>
+    name: <%= appName %>-ingress
+    annotations:
+      nginx.ingress.kubernetes.io/proxy-body-size: 500M
+  spec:
+    rules:
+    # 域名
+    - host: <%= appName %>.dev2.<%= company %>.com
+      http:
+        paths:
+        - path: /
+          backend:
+            # 负载均衡依赖的服务
+            serviceName: <%= appName %>-svc
+            servicePort: http
+---
+  # 环境变量配置
+  apiVersion: v1
+  kind: ConfigMap
+  metadata:
+    namespace: <%=  namespace %>
+    name: <%= appName %>-env
+  # 项目使用的相关变量，根据客户的域名改变
+  data:
+    ENV_APP_BASE_API : 'https://baseapi'
+
+---
+  # 服务配置
+  apiVersion: v1
+  kind: Service
+  metadata:
+    namespace: <%=  namespace %>
+    name: <%= appName %>-svc
+    labels:
+      app: <%= appName %>-svc
+  spec:
+    ports:
+    - port: 80
+      targetPort: http
+      protocol: TCP
+      name: http
+    selector:
+      app: <%= appName %>
+
+---
+  # 工作负载
+  apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    namespace: <%=  namespace %>
+    name: <%= appName %>
+  spec:
+    selector:
+      matchLabels:
+        app: <%= appName %>
+    replicas: 1
+    template:
+      metadata:
+        labels:
+          app: <%= appName %>
+      spec:
+        containers:
+        - name: <%= appName %>
+          # 这是工作负载依赖的镜像地址
+          image: harbor.<%= company %>.com/<%=  namespace %>/<%= appName %>:0.1.0
+          imagePullPolicy: Always
+          ports:
+          - containerPort: 80
+            name: http
+          envFrom:
+          # 工作负载依赖的环境变量配置
+          - configMapRef:
+              name: <%= appName %>-env
+          resources:
+            requests:
+              memory: "128Mi"
+            limits:
+              memory: "256Mi"
+        # 工作负载拉取镜像时的凭证
+        imagePullSecrets:
+          - name: <%=  namespace %>-image-pull-secret

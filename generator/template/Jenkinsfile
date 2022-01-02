@@ -1,0 +1,77 @@
+pipeline {
+
+  agent any
+
+  triggers {
+    // 每小时检查仓库变动
+    pollSCM '@hourly'
+  }
+
+  options {
+    // 禁止因Multibranch pipeline index动作触发构建
+    overrideIndexTriggers false
+    // 禁止并发构建
+    disableConcurrentBuilds()
+    // 构建结果保留天数10天，最多保留10个
+    buildDiscarder logRotator(daysToKeepStr: '1', numToKeepStr: '2')
+    // 控制台打出时间戳
+    // timestamps()
+    // 构建超时设置：15分钟
+    timeout(60)
+  }
+
+  stages {
+    stage('Build Dist') {
+      when {
+        branch 'master'
+        beforeAgent true
+      }
+      steps {
+        script {
+          def image = docker.image('node:14')
+          image.pull()
+          image.inside() {
+            sh 'chmod +x *.sh'
+            sh './npm-build.sh'
+          }
+        }
+      }
+    }
+
+    stage('Build Docker Image') {
+      when {
+        branch 'master'
+        beforeAgent true
+      }
+      steps {
+        script {
+          /*
+            参考文档：
+            https://jenkins.io/doc/book/pipeline/docker/
+            https://go.cloudbees.com/docs/cloudbees-documentation/cje-user-guide/index.html#docker-workflow
+          */
+          /* 目前不这样做不行，见 https://issues.jenkins-ci.org/browse/JENKINS-54901 */
+          docker.withRegistry('https://harbor.<%= company %>.com', 'harbor登录令牌') {
+            sh './deploy.sh'
+          }
+        }
+      }
+    }
+  }
+
+  post {
+    changed {
+      // 发送邮件到本次change所包含的committer
+      emailext recipientProviders: [developers()],
+        subject: "Pipeline [${currentBuild.fullDisplayName}] built ${currentBuild.currentResult}",
+        body: "More details: ${currentBuild.absoluteUrl}"
+    }
+    cleanup {
+      // 清理npm构建得到的结果
+      sh 'rm -rf ./node_modules'
+      sh 'rm -rf ./dist'
+      // 清理docker占用的磁盘空间
+      sh 'docker system prune -f'
+    }
+  }
+}
