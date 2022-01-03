@@ -1,12 +1,10 @@
 {
   "name": "vue-cli-plugin-jenkins",
-  "version": "1.0.2",
-  "description": "",
+  "version": "1.0.3",
+  "description": "A Vue CLI plugin to initialize Continuous Integration on many platforms for your project using **YARN** or **NPM**.",
   "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
   "keywords": [],
-  "author": "yongjian.wang",
-  "license": "ISC"
+  "author": "yongjian wang",
+  "repository": "https://github.com/695648896/vue-cli-plugin-jenkins",
+  "license": "MIT"
 }
